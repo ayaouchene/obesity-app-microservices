@@ -1,0 +1,27 @@
+const express = require('express');
+const { createProxyMiddleware } = require('http-proxy-middleware');
+
+const app = express();
+
+// Proxy pour auth-service
+app.use(
+  '/api/auth',
+  createProxyMiddleware({
+    target: 'http://auth-service:5000',
+    changeOrigin: true,
+  })
+);
+
+// Proxy pour chat-service
+app.use(
+  '/api/chat',
+  createProxyMiddleware({
+    target: 'http://chat-service:5002',
+    changeOrigin: true,
+  })
+);
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🌐 Gateway API running on port ${PORT}`);
+});
