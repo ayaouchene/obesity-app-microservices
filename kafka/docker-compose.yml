@@ -36,6 +36,26 @@ services:
     networks:
       - obesity-net
 
+
+  # 📅 Appointment Service
+  appointment-service:
+    build: ../appointment-service
+    container_name: appointment-service
+    restart: always
+    ports:
+      - "5001:5001"
+    depends_on:
+      - mongodb
+      - kafka
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/appointmentdb
+      - JWT_SECRET=supersecretkey
+      - KAFKA_BROKER=kafka:9092
+      - PORT=5001
+      - KAFKAJS_NO_PARTITIONER_WARNING=1
+    networks:
+      - obesity-net
+
   # 🐘 MongoDB
   mongodb:
     image: mongo:5

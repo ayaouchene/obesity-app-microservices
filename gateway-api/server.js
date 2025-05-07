@@ -21,6 +21,22 @@ app.use(
   })
 );
 
+// Proxy pour appointment-service
+app.use(
+  '/api/appointments',
+  createProxyMiddleware({
+    target: 'http://appointment-service:5001',
+    changeOrigin: true,
+  })
+);
+app.use(
+  '/api/assessments',
+  createProxyMiddleware({
+    target: 'http://appointment-service:5001',
+    changeOrigin: true,
+  })
+);
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🌐 Gateway API running on port ${PORT}`);
