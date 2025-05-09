@@ -10,7 +10,7 @@ services:
       - mongodb
     environment:
       - MONGO_URI=mongodb://mongodb:27017/authdb
-      - JWT_SECRET=supersecretkey # Remplacez par une clé forte en production
+      - JWT_SECRET=supersecretkey
       - PORT=5000
     networks:
       - obesity-net
@@ -30,12 +30,11 @@ services:
     environment:
       - MONGO_URI=mongodb://mongodb:27017/chatdb
       - KAFKA_BROKER=kafka:9092
-      - JWT_SECRET=supersecretkey # Identique à auth-service
+      - JWT_SECRET=supersecretkey
       - PORT=5002
-      - KAFKAJS_NO_PARTITIONER_WARNING=1 # Supprime l'avertissement KafkaJS
+      - KAFKAJS_NO_PARTITIONER_WARNING=1
     networks:
       - obesity-net
-
 
   # 📅 Appointment Service
   appointment-service:
@@ -72,35 +71,35 @@ services:
     networks:
       - obesity-net
 
-  # 🚀 Kafka avec KRaft mode (sans Zookeeper)
+    # 🚀 Kafka avec KRaft mode
   kafka:
-    image: bitnami/kafka:latest
+    image: bitnami/kafka:3.6
     container_name: kafka
     ports:
       - "9092:9092"
       - "9093:9093"
     environment:
-      - KAFKA_CFG_NODE_ID=1
-      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_ENABLE_KRAFT=yes
+      - KAFKA_CFG_NODE_ID=0
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
       - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
-      - KAFKA_KRAFT_CLUSTER_ID=obesity-cluster
-      - KAFKA_CFG_BROKER_ID=1
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_KRAFT_CLUSTER_ID=J4g2h8xQTOyV5kL9mN7pZw  # ← Modifié pour être un UUID valide
       - ALLOW_PLAINTEXT_LISTENER=yes
     volumes:
       - kafka_data:/bitnami/kafka
     healthcheck:
-      test: ["CMD", "kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
+      test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 10
     networks:
       - obesity-net
-
+      
   # 🧭 Kafka UI
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -126,15 +125,14 @@ services:
     depends_on:
       - auth-service
       - chat-service
+      - appointment-service
     networks:
       - obesity-net
 
-# Déclaration des volumes au niveau racine
 volumes:
   kafka_data:
   mongo_data:
 
-# Déclaration du réseau
 networks:
   obesity-net:
     driver: bridge

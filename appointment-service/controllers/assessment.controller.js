@@ -1,44 +1,58 @@
 const InitialAssessment = require('../models/initialAssessment.model');
-const { generatePDF } = require('../services/pdf.generator');
+  const Appointment = require('../models/appointment.model');
+  const { generatePDF } = require('../services/pdf.generator');
+  const axios = require('axios');
 
-const assessmentController = {
-  // Soumettre un bilan initial
-  async submitAssessment(req, res) {
-    try {
-      const { appointmentId, patientId, data } = req.body;
-      const assessment = new InitialAssessment({
-        appointmentId,
-        patientId,
-        data,
-      });
+  const assessmentController = {
+    async createAssessment(req, res) {
+      try {
+        const { appointmentId, patientId, data } = req.body;
 
-      await assessment.save();
-      res.status(201).json(assessment);
-    } catch (error) {
-      res.status(500).json({ message: 'Erreur lors de la soumission du bilan', error });
-    }
-  },
+        // Vérifier si le rendez-vous existe
+        const appointment = await Appointment.findById(appointmentId);
+        if (!appointment || appointment.patientId !== patientId) {
+          return res.status(404).json({ message: 'Rendez-vous non trouvé ou patient non autorisé' });
+        }
 
-  // Générer un PDF pour un bilan initial
-  async getAssessmentPDF(req, res) {
-    try {
-      const { id } = req.params;
-      const assessment = await InitialAssessment.findById(id).populate('appointmentId');
+        // Récupérer les informations du patient via gateway-api
+        const patientResponse = await axios.get(`http://gateway-api:3000/api/users/${patientId}`, {
+          headers: { Authorization: req.header('Authorization') },
+        });
 
-      if (!assessment) {
-        return res.status(404).json({ message: 'Bilan non trouvé' });
+        // Créer le bilan initial
+        const assessment = new InitialAssessment({
+          appointmentId,
+          patientId,
+          patientName: patientResponse.data.name,
+          patientFirstName: patientResponse.data.firstName,
+          data,
+        });
+
+        await assessment.save();
+        res.status(201).json(assessment);
+      } catch (error) {
+        res.status(500).json({ message: 'Erreur lors de la création du bilan', error });
       }
+    },
 
-      const pdfBuffer = await generatePDF(assessment);
-      res.set({
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename=assessment_${id}.pdf`,
-      });
-      res.send(pdfBuffer);
-    } catch (error) {
-      res.status(500).json({ message: 'Erreur lors de la génération du PDF', error });
-    }
-  },
-};
+    async getAssessmentPDF(req, res) {
+      try {
+        const { id } = req.params;
+        const assessment = await InitialAssessment.findById(id);
+        if (!assessment) {
+          return res.status(404).json({ message: 'Bilan non trouvé' });
+        }
 
-module.exports = assessmentController;
+        const pdfBuffer = await generatePDF(assessment);
+        res.set({
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': 'attachment; filename=assessment.pdf',
+        });
+        res.send(pdfBuffer);
+      } catch (error) {
+        res.status(500).json({ message: 'Erreur lors de la génération du PDF', error });
+      }
+    },
+  };
+
+  module.exports = assessmentController;

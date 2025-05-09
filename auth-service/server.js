@@ -1,32 +1,21 @@
 const express = require('express');
-const mongoose = require('mongoose');
-const dotenv = require('dotenv');
-const cors = require('cors');
+  const connectDB = require('./config/db');
+  const authRoutes = require('./routes/auth.routes');
+  const userRoutes = require('./routes/user.routes');
 
-// Charger les variables d'environnement
-dotenv.config();
+  const app = express();
 
-// Créer l'app
-const app = express();
+  app.use(express.json());
+  app.use('/api/auth', authRoutes);
+  app.use('/api/users', userRoutes);
 
-// Middlewares
-app.use(cors());
-app.use(express.json());
-
-// Routes
-app.use('/api/auth', require('./routes/authRoutes'));
-
-// Connexion à MongoDB
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-}).then(() => {
-  console.log('✅ Connexion à MongoDB réussie');
-  // Lancer le serveur
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => {
-    console.log(`🚀 Serveur Auth démarré sur le port ${PORT}`);
-  });
-}).catch((err) => {
-  console.error('❌ Erreur de connexion à MongoDB :', err.message);
-});
+
+  const startServer = async () => {
+    await connectDB();
+    app.listen(PORT, () => {
+      console.log(`🌐 Auth Service running on port ${PORT}`);
+    });
+  };
+
+  startServer();

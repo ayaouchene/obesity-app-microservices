@@ -1,67 +1,60 @@
-const User = require('../models/User');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const Patient = require('../models/patient.model');
+  const Doctor = require('../models/doctor.model');
+  const jwt = require('jsonwebtoken');
+  const bcrypt = require('bcryptjs');
 
-// 🔐 Inscription
-exports.register = async (req, res) => {
-  const { name, email, password, role } = req.body;
-
-  try {
-    // Vérifier si l'utilisateur existe déjà
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Email déjà utilisé' });
-    }
-
-    // Hasher le mot de passe
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Créer l'utilisateur
-    const newUser = new User({
-      name,
-      email,
-      password: hashedPassword,
-      role
-    });
-
-    await newUser.save();
-
-    res.status(201).json({ message: 'Inscription réussie' });
-  } catch (err) {
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-};
-
-// 🔐 Connexion
-exports.login = async (req, res) => {
-  const { email, password } = req.body;
-
-  try {
-    // Chercher l'utilisateur
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: 'Utilisateur non trouvé' });
-
-    // Vérifier le mot de passe
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: 'Mot de passe incorrect' });
-
-    // Générer le token
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '1d' }
-    );
-
-    res.status(200).json({
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role
+  const authController = {
+    async register(req, res) {
+      try {
+        const { userId, email, password, role, ...data } = req.body;
+        if (role === 'patient') {
+          const existingPatient = await Patient.findOne({ $or: [{ userId }, { email }] });
+          if (existingPatient) {
+            return res.status(400).json({ message: 'Utilisateur ou email déjà existant' });
+          }
+          const patient = new Patient({ userId, email, password, ...data });
+          await patient.save();
+          const token = jwt.sign({ userId, role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+          res.status(201).json({ token });
+        } else if (role === 'doctor') {
+          const existingDoctor = await Doctor.findOne({ $or: [{ userId }, { email }] });
+          if (existingDoctor) {
+            return res.status(400).json({ message: 'Utilisateur ou email déjà existant' });
+          }
+          const doctor = new Doctor({ userId, email, password, ...data });
+          await doctor.save();
+          const token = jwt.sign({ userId, role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+          res.status(201).json({ token });
+        } else {
+          return res.status(400).json({ message: 'Rôle invalide' });
+        }
+      } catch (error) {
+        res.status(500).json({ message: 'Erreur lors de l’inscription', error });
       }
-    });
-  } catch (err) {
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-};
+    },
+
+    async login(req, res) {
+      try {
+        const { email, password } = req.body;
+        let user = await Patient.findOne({ email });
+        let role = 'patient';
+        if (!user) {
+          user = await Doctor.findOne({ email });
+          role = 'doctor';
+        }
+        if (!user) {
+          return res.status(401).json({ message: 'Identifiants invalides' });
+        }
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+          return res.status(401).json({ message: 'Identifiants invalides' });
+        }
+        const token = jwt.sign({ userId: user.userId, role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        res.status(200).json({ token });
+      } catch (error) {
+        res.status(500).json({ message: 'Erreur lors de la connexion', error });
+      }
+    },
+  };
+
+  module.exports = authController;

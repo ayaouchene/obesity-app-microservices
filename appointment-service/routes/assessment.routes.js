@@ -1,13 +1,10 @@
 const express = require('express');
-const router = express.Router();
-const assessmentController = require('../controllers/assessment.controller');
-const authMiddleware = require('../middlewares/auth.middleware');
-const { validateAssessment } = require('../middlewares/validation.middleware');
+  const router = express.Router();
+  const assessmentController = require('../controllers/assessment.controller');
+  const validate = require('../middlewares/validation.middleware');
+  const authMiddleware = require('../middlewares/auth.middleware');
 
-// Soumission d'un bilan initial
-router.post('/', authMiddleware, validateAssessment, assessmentController.submitAssessment);
+  router.post('/', authMiddleware, validate.createAssessment, assessmentController.createAssessment);
+  router.get('/:id/pdf', authMiddleware, validate.getAssessmentPDF, assessmentController.getAssessmentPDF);
 
-// Génération d'un PDF pour un bilan
-router.get('/:id/pdf', authMiddleware, assessmentController.getAssessmentPDF);
-
-module.exports = router;
+  module.exports = router;

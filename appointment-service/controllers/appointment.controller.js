@@ -1,106 +1,126 @@
 const Appointment = require('../models/appointment.model');
-const Slot = require('../models/slot.model');
-const { produceMessage } = require('../services/kafka.producer');
+  const Slot = require('../models/slot.model');
+  const { produceMessage } = require('../services/kafka.producer');
+  const axios = require('axios');
 
-const appointmentController = {
-  // Récupérer les créneaux disponibles
-  async getAvailableSlots(req, res) {
-    try {
-      const { doctorId, date } = req.query;
-      const startOfDay = new Date(date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
+  const appointmentController = {
+    async getAvailableSlots(req, res) {
+      try {
+        const { doctorId, date, page = 1, limit = 10 } = req.query;
+        const startOfDay = new Date(date);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(date);
+        endOfDay.setHours(23, 59, 59, 999);
 
-      const slots = await Slot.find({
-        doctorId,
-        isAvailable: true,
-        startTime: { $gte: startOfDay, $lte: endOfDay },
-      });
+        const slots = await Slot.find({
+          doctorId,
+          isAvailable: true,
+          startTime: { $gte: startOfDay, $lte: endOfDay },
+        })
+          .skip((page - 1) * limit)
+          .limit(parseInt(limit));
 
-      res.status(200).json(slots);
-    } catch (error) {
-      res.status(500).json({ message: 'Erreur lors de la récupération des créneaux', error });
-    }
-  },
-
-  // Créer un rendez-vous
-  async createAppointment(req, res) {
-    try {
-      const { patientId, doctorId, slotId, type, consultationType, patientDetails } = req.body;
-
-      // Vérifier si le créneau est disponible
-      const slot = await Slot.findById(slotId);
-      if (!slot || !slot.isAvailable) {
-        return res.status(400).json({ message: 'Créneau non disponible' });
+        res.status(200).json(slots);
+      } catch (error) {
+        res.status(500).json({ message: 'Erreur lors de la récupération des créneaux', error });
       }
+    },
 
-      // Créer le rendez-vous
-      const appointment = new Appointment({
-        patientId,
-        doctorId,
-        slotId,
-        type,
-        consultationType,
-        patientDetails,
-      });
+    async createAppointment(req, res) {
+      try {
+        const { patientId, doctorId, slotId, type, consultationType } = req.body;
 
-      await appointment.save();
+        // Vérifier si le créneau est disponible
+        const slot = await Slot.findOneAndUpdate(
+          { _id: slotId, isAvailable: true },
+          { $set: { isAvailable: false } },
+          { new: true }
+        );
+        
+        if (!slot) {
+          return res.status(400).json({ message: 'Créneau non disponible' });
+        }
 
-      // Marquer le créneau comme réservé
-      slot.isAvailable = false;
-      await slot.save();
+        // Récupérer les coordonnées du patient via gateway-api
+        const patientResponse = await axios.get(`http://gateway-api:3000/api/users/${patientId}`, {
+          headers: { Authorization: req.header('Authorization') },
+        });
+        const patientDetails = {
+          name: patientResponse.data.name,
+          firstName: patientResponse.data.firstName,
+          phone: patientResponse.data.phone,
+          address: patientResponse.data.address,
+        };
 
-      // Publier un événement Kafka
-      await produceMessage('appointment_created', {
-        appointmentId: appointment._id,
-        patientId,
-        doctorId,
-        slotId,
-      });
+        // Créer le rendez-vous
+        const appointment = new Appointment({
+          patientId,
+          doctorId,
+          slotId,
+          type,
+          consultationType,
+          patientDetails,
+        });
 
-      res.status(201).json(appointment);
-    } catch (error) {
-      res.status(500).json({ message: 'Erreur lors de la création du rendez-vous', error });
-    }
-  },
+        await appointment.save();
 
-  // Lister les rendez-vous en attente pour le médecin
-  async getPendingAppointments(req, res) {
-    try {
-      const { doctorId } = req.query;
-      const appointments = await Appointment.find({ doctorId, status: 'pending' }).populate('slotId');
-      res.status(200).json(appointments);
-    } catch (error) {
-      res.status(500).json({ message: 'Erreur lors de la récupération des rendez-vous', error });
-    }
-  },
+        // Marquer le créneau comme réservé
+        slot.isAvailable = false;
+        await slot.save();
 
-  // Valider un rendez-vous
-  async validateAppointment(req, res) {
-    try {
-      const { id } = req.params;
-      const appointment = await Appointment.findById(id);
+        // Publier un événement Kafka
+        await produceMessage('appointment_created', {
+          appointmentId: appointment._id,
+          patientId,
+          doctorId,
+          slotId,
+        });
 
-      if (!appointment) {
-        return res.status(404).json({ message: 'Rendez-vous non trouvé' });
+        res.status(201).json(appointment);
+      } catch (error) {
+        res.status(500).json({ message: 'Erreur lors de la création du rendez-vous', error });
       }
+    },
 
-      appointment.status = 'confirmed';
-      await appointment.save();
+    async getPendingAppointments(req, res) {
+      try {
+        const { doctorId } = req.query;
+        if (req.user.role !== 'doctor') {
+          return res.status(403).json({ message: 'Accès réservé aux médecins' });
+        }
+        const appointments = await Appointment.find({ doctorId, status: 'pending' }).populate('slotId');
+        res.status(200).json(appointments);
+      } catch (error) {
+        res.status(500).json({ message: 'Erreur lors de la récupération des rendez-vous', error });
+      }
+    },
 
-      // Publier un événement Kafka
-      await produceMessage('appointment_confirmed', {
-        appointmentId: appointment._id,
-        patientId: appointment.patientId,
-        doctorId: appointment.doctorId,
-      });
+    async validateAppointment(req, res) {
+      try {
+        const { id } = req.params;
+        if (req.user.role !== 'doctor') {
+          return res.status(403).json({ message: 'Accès réservé aux médecins' });
+        }
 
-      res.status(200).json(appointment);
-    } catch (error) {
-      res.status(500).json({ message: 'Erreur lors de la validation du rendez-vous', error });
-    }
-  },
-};
+        const appointment = await Appointment.findById(id);
+        if (!appointment) {
+          return res.status(404).json({ message: 'Rendez-vous non trouvé' });
+        }
 
-module.exports = appointmentController;
+        appointment.status = 'confirmed';
+        await appointment.save();
+
+        await produceMessage('appointment_confirmed', {
+          appointmentId: appointment._id,
+          patientId: appointment.patientId,
+          doctorId: appointment.doctorId,
+        });
+
+        res.status(200).json(appointment);
+      } catch (error) {
+        res.status(500).json({ message: 'Erreur lors de la validation du rendez-vous', error });
+      }
+    },
+  };
+
+  module.exports = appointmentController;
