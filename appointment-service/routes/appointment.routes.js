@@ -1,12 +1,13 @@
 const express = require('express');
-  const router = express.Router();
-  const appointmentController = require('../controllers/appointment.controller');
-  const validate = require('../middlewares/validation.middleware');
-  const authMiddleware = require('../middlewares/auth.middleware');
+const router = express.Router();
+const appointmentController = require('../controllers/appointment.controller');
+const verifyToken = require('../middlewares/auth.middleware');
 
-  router.get('/slots', authMiddleware, validate.getAvailableSlots, appointmentController.getAvailableSlots);
-  router.post('/', authMiddleware, validate.createAppointment, appointmentController.createAppointment);
-  router.get('/', authMiddleware, validate.getPendingAppointments, appointmentController.getPendingAppointments);
-  router.put('/:id/validate', authMiddleware, validate.validateAppointment, appointmentController.validateAppointment);
+router.get('/slots', verifyToken, appointmentController.getAvailableSlots);
+router.post('/', verifyToken, appointmentController.createAppointment);
+router.get('/', verifyToken, appointmentController.getPendingAppointments);
+router.put('/:id/validate', verifyToken, appointmentController.validateAppointment);
+router.put('/:id', verifyToken, appointmentController.updateAppointment);
+router.put('/:id/reject', verifyToken, appointmentController.rejectAppointment);
 
-  module.exports = router;
+module.exports = router;

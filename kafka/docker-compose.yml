@@ -55,6 +55,28 @@ services:
     networks:
       - obesity-net
 
+  # 🩺 Profile Médecin Service
+  profile-medecin-service:
+    build:
+      context: ../profile-medecin-service
+      dockerfile: Dockerfile
+    container_name: profile-medecin-service
+    restart: always
+    ports:
+      - "5003:5003"
+    depends_on:
+      - mongodb
+      - kafka
+    environment:
+      - NODE_ENV=production
+      - JWT_SECRET=supersecretkey  # ⭐️ AJOUTEZ CETTE LIGNE ⭐️
+      - MONGO_URI=mongodb://mongodb:27017/profiledb  # Recommandé si MongoDB est utilisé
+      - PORT=5003  # Pour cohérence
+    volumes:
+      - ../profile-medecin-service:/usr/src/app
+    networks:
+      - obesity-net
+      
   # 🐘 MongoDB
   mongodb:
     image: mongo:5
@@ -71,7 +93,7 @@ services:
     networks:
       - obesity-net
 
-    # 🚀 Kafka avec KRaft mode
+  # 🚀 Kafka avec KRaft mode
   kafka:
     image: bitnami/kafka:3.6
     container_name: kafka
@@ -88,7 +110,7 @@ services:
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-      - KAFKA_KRAFT_CLUSTER_ID=J4g2h8xQTOyV5kL9mN7pZw  # ← Modifié pour être un UUID valide
+      - KAFKA_KRAFT_CLUSTER_ID=J4g2h8xQTOyV5kL9mN7pZw
       - ALLOW_PLAINTEXT_LISTENER=yes
     volumes:
       - kafka_data:/bitnami/kafka
@@ -99,7 +121,7 @@ services:
       retries: 10
     networks:
       - obesity-net
-      
+
   # 🧭 Kafka UI
   kafka-ui:
     image: provectuslabs/kafka-ui:latest

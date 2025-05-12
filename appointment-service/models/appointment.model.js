@@ -37,7 +37,7 @@ const mongoose = require('mongoose');
     },
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'cancelled'],
+      enum: ['pending', 'confirmed', 'cancelled', 'rejected'],
       default: 'pending',
     },
     createdAt: {
