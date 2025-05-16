@@ -1,18 +1,16 @@
-# Utilise l’image officielle de Node.js
 FROM node:18
-
-# Crée un dossier pour ton app
 WORKDIR /app
-
-# Copie les fichiers nécessaires
 COPY package*.json ./
-
-# Installe les dépendances
 RUN npm install
-
-# Copie tout le code source
-COPY . .
-
-# Lancement du serveur
+COPY middlewares ./middlewares
+COPY routes ./routes
+COPY controllers ./controllers
+COPY models ./models
+COPY socket ./socket
+COPY utils ./utils
+COPY config ./config
+COPY server.js ./
+COPY initGroups.js ./
+COPY .env ./
 EXPOSE 5002
 CMD ["node", "server.js"]

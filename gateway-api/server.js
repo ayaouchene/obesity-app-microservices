@@ -45,6 +45,15 @@ const express = require('express');
        changeOrigin: true,
      })
    );
+    app.use(
+  '/api/chat',
+  createProxyMiddleware({
+    target: 'http://chat-service:5002',
+    changeOrigin: true,
+    pathRewrite: { '^/api/chat': '/api/chat' },
+    ws: true, 
+  })
+);
 
    const PORT = process.env.PORT || 3000;
    app.listen(PORT, () => {
