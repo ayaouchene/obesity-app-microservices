@@ -10,6 +10,6 @@ const jwt = require('jsonwebtoken');
       req.user = decoded; // Contient userId et role
       next();
     } catch (error) {
-      res.status(401).json({ message: 'Token invalide' });
+      res.status(401).json({ message: 'Token invalide veuillez ressayer' });
     }
   };
